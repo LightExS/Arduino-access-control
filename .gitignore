@@ -1,2 +1,3 @@
 .vscode
 test_local_server.py
+users_database.db
