@@ -1,16 +1,20 @@
-from fastapi import Request, FastAPI
+from fastapi import FastAPI
 from pydantic import BaseModel
 import uvicorn
-import json
+import sqlalchemy as db
 
 app = FastAPI()
 
-database = [
-    [51, 125, 33, 248],
-    [24, 99, 5, 7],
-    [240, 59, 24, 80],
-    [0, 42, 255, 93],
-]
+engine = db.create_engine("sqlite:///users_database.db")
+con = engine.connect()
+metadata = db.MetaData()
+
+authorized_users = db.Table("authorized_users", metadata, autoload_with=engine)
+access_history = db.Table("access_history", metadata, autoload_with=engine)
+
+data = con.execute(db.select(authorized_users)).fetchall()
+
+keys = [list(map(int, row[2].split())) for row in data]
 
 
 class IncomingData(BaseModel):
@@ -18,20 +22,18 @@ class IncomingData(BaseModel):
     key: list = []
 
 
-class OutgoingData(BaseModel):
-    result: str
-
-
-@app.post("/", response_model=OutgoingData)
+@app.post("/")
 def post_req(payload: IncomingData):
-    data = payload.key
-    print(data)
-    return {"result": "post_success"}
+    key = payload.key
+    print(f"User with key: {key} used door")
+    query = db.insert(access_history).values(key=" ".join(map(str, key)))
+    con.execute(query)
+    con.commit()
 
 
 @app.get("/")
 def get_req():
-    return {"keys": database, "size": len(database)}
+    return {"keys": keys}
 
 
 if __name__ == "__main__":
